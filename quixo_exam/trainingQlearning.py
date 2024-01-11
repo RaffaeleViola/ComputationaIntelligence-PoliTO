@@ -1,102 +1,34 @@
+from game import Move, Game, Player
+import random
+from tqdm import tqdm
+import numpy as np
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from enum import Enum
-import numpy as np
+from quixo_exam.qtable import Qtable
+from quixo_exam.main import RandomPlayer
+from quixo_exam.training import next_acts, is_accetptable
 
 
-# Rules on PDF
+class QPlayer(Player):
+    def __init__(self, qtab: Qtable, player) -> None:
+        super().__init__()
+        self.qtable = qtab
+        self.epsilon = None
+        self.player = player
 
-
-class Move(Enum):
-    '''
-    Selects where you want to place the taken piece. The rest of the pieces are shifted
-    '''
-    TOP = 0
-    BOTTOM = 1
-    LEFT = 2
-    RIGHT = 3
-
-
-class Player(ABC):
-    def __init__(self) -> None:
-        '''You can change this for your player if you need to handle state/have memory'''
-        pass
-
-    @abstractmethod
     def make_move(self, game: 'Game') -> tuple[tuple[int, int], Move]:
-        '''
-        The game accepts coordinates of the type (X, Y). X goes from left to right, while Y goes from top to bottom, as in 2D graphics.
-        Thus, the coordinates that this method returns shall be in the (X, Y) format.
-
-        game: the Quixo game. You can use it to override the current game with yours, but everything is evaluated by the main game
-        return values: this method shall return a tuple of X,Y positions and a move among TOP, BOTTOM, LEFT and RIGHT
-        '''
-        pass
+        mv = epsilon_greedy_policy(self.qtable, game, self.epsilon, self.player)
+        return mv
 
 
-class Game(object):
-    def __init__(self) -> None:
-        self._board = np.ones((5, 5), dtype=np.uint8) * -1
-        # self._board[0, 0] = self._board[0, 1] = self._board[0, 2] = self._board[0, 3] = 0
-        # self._board[4, 4] = 1
-        self.current_player_idx = 1
+class MyGame(Game):
+    def __init__(self):
+        super().__init__()
 
-    def get_board(self) -> np.ndarray:
-        '''
-        Returns the board
-        '''
-        return deepcopy(self._board)
-
-    def get_current_player(self) -> int:
-        '''
-        Returns the current player
-        '''
-        return deepcopy(self.current_player_idx)
-
-    def print(self):
-        '''Prints the board. -1 are neutral pieces, 0 are pieces of player 0, 1 pieces of player 1'''
-        print(self._board)
-
-    def check_winner(self) -> int:
-        '''Check the winner. Returns the player ID of the winner if any, otherwise returns -1'''
-        # for each row
-        player = self.get_current_player()
-        winner = -1
-        for x in range(self._board.shape[0]):
-            # if a player has completed an entire row
-            if self._board[x, 0] != -1 and all(self._board[x, :] == self._board[x, 0]):
-                # return winner is this guy
-                winner = self._board[x, 0]
-        if winner > -1 and winner != self.get_current_player():
-            return winner
-        # for each column
-        for y in range(self._board.shape[1]):
-            # if a player has completed an entire column
-            if self._board[0, y] != -1 and all(self._board[:, y] == self._board[0, y]):
-                # return the relative id
-                winner = self._board[0, y]
-        if winner > -1 and winner != self.get_current_player():
-            return winner
-        # if a player has completed the principal diagonal
-        if self._board[0, 0] != -1 and all(
-                [self._board[x, x]
-                 for x in range(self._board.shape[0])] == self._board[0, 0]
-        ):
-            # return the relative id
-            winner = self._board[0, 0]
-        if winner > -1 and winner != self.get_current_player():
-            return winner
-        # if a player has completed the secondary diagonal
-        if self._board[0, -1] != -1 and all(
-                [self._board[x, -(x + 1)]
-                 for x in range(self._board.shape[0])] == self._board[0, -1]
-        ):
-            # return the relative id
-            winner = self._board[0, -1]
-        return winner
-
-    def play(self, player1: Player, player2: Player) -> int:
-        '''Play the game. Returns the winning player'''
+    def play(self, player1: Player, player2: Player):
+        state_history = [tuple(self.get_board().ravel())]
+        actions_history = []
         players = [player1, player2]
         winner = -1
         steps = 0
@@ -108,15 +40,17 @@ class Game(object):
                 from_pos, slide = players[self.current_player_idx].make_move(
                     self)
                 ok = self.__move(from_pos, slide, self.current_player_idx)
-                if self.current_player_idx == 0 and not ok:
-                    print("It's weird shit")
-                    print(from_pos, slide)
+                if ok:
+                    if self.current_player_idx == 0:
+                        actions_history.append((from_pos, slide))
+                    else:
+                        state_history.append(tuple(self.get_board().ravel()))
             # self.print()
             steps += 1
             if steps == 100:
-                return -1
+                return -1, state_history, actions_history
             winner = self.check_winner()
-        return winner
+        return winner, state_history, actions_history
 
     def __move(self, from_pos: tuple[int, int], slide: Move, player_id: int) -> bool:
         '''Perform a move'''
@@ -231,4 +165,71 @@ class Game(object):
                 # move the piece down
                 self._board[(self._board.shape[0] - 1, from_pos[1])] = piece
         return acceptable
+
+
+def backpropagation(qtable: Qtable, states: list, actions: list, reward, learning_rate, gamma):
+    default = 0.0
+    next_state = None
+    for act, state in zip(reversed(actions), reversed(states)):
+        fut_max = max(qtable.table[next_state].values()) if next_state else default
+        qtable.table[state][act] = qtable.table[state][act] + learning_rate * (
+                reward + gamma * fut_max - qtable.table[state][act])
+        next_state = state
+    return qtable
+
+
+def next_accetptable_moves(state: Game, player: int):
+    actions = next_acts(state, player)
+    return [(act, direct) for act in actions for direct in [Move.TOP, Move.LEFT, Move.RIGHT, Move.BOTTOM]
+            if is_accetptable(act, direct, state)]
+
+
+def epsilon_greedy_policy(qtable: Qtable, state: Game, epsilon: float, player: int):
+    random_int = random.uniform(0, 1)
+    actions = next_accetptable_moves(state, player)
+    if random_int > epsilon and tuple(state.get_board().ravel()) in qtable.get_table():
+        return max(actions, key=lambda act: qtable.get_table()[tuple(state.get_board().ravel())][act])
+    else:
+        action = actions[random.randint(0, len(actions) - 1)]
+        if tuple(state.get_board().ravel()) not in qtable.get_table():
+            tmp = {mv: 0.0 for mv in actions}
+            qtable.get_table()[tuple(state.get_board().ravel())] = tmp
+    return action
+
+
+def training():
+    # Training parameters
+    n_training_episodes = 10_000
+    learning_rate = 0.7
+
+    # Environment parameters
+    gamma = 0.95
+
+    # Exploration parameters
+    max_epsilon = 1.0
+    min_epsilon = 0.01
+    decay_rate = 0.0005
+    tab = Qtable()
+    player1 = RandomPlayer()
+    player0 = QPlayer(tab, 0)
+    for episode in tqdm(range(n_training_episodes)):
+        epsilon = min_epsilon + (max_epsilon - min_epsilon) * np.exp(-decay_rate * episode)
+        player0.epsilon = epsilon
+        for n in [0]:
+            # Reset the environment
+            env = MyGame()
+            # simulating game
+            done, state_history, actions_history = env.play(player0, player1)
+            # updating states
+            reward = -(2*done - 1) if done != -1 else 0.1  # +1 win -1 lose 0.1 draw
+            if len(state_history) != len(actions_history):
+                # print(state_history)
+                # print(actions_history)
+                state_history.pop()
+            player0.qtable = backpropagation(player0.qtable, state_history, actions_history, reward, learning_rate, gamma)
+    print(player0.qtable.get_table())
+    return player0.qtable
+
+
+training()
 
