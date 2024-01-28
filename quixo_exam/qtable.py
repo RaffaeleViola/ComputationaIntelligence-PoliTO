@@ -45,7 +45,8 @@ class Qtable:
 
     def load(self, path):
         with open(path, "r") as f:
-            for line in f.readlines():
+            print('Loading Table...')
+            for line in tqdm(f.readlines()):
                 words = line.strip().split(";")
                 key = read_tuple(words[0])
                 tmp_dict = dict()
@@ -55,20 +56,17 @@ class Qtable:
                     val = float(act_val[1])
                     tmp_dict[act] = val
                 self.table[key] = tmp_dict
+            print('Table Loaded')
 
     def get_table(self):
         return self.table
 
+    def __contains__(self, item):
+        return item in self.table
 
-# prova = {(1, 1, 1, 0, 0, 0, -1, -1, 1): {((0, 0), Move.TOP): 0.5,
-#                                          ((3, 4), Move.RIGHT): 5.27}
-#     ,
-#          (1, -1, -1, 0, 0, 0, -1, -1, 1): {((1, 2), Move.BOTTOM): 0.7}
-#          }
-#
-# qtable = Qtable()
-# qtable.table = prova
-# qtable.store("./table.txt")
-# new_tab = Qtable()
-# new_tab.load("./table.txt")
-# print(new_tab.table)
+    def __getitem__(self, item):
+        return self.table[item]
+
+    def __setitem__(self, key, value):
+        self.table[key] = value
+

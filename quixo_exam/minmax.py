@@ -78,7 +78,6 @@ min_cache = dict()
 
 
 def rotate_board(board: np.ndarray):
-    boards = []
     # 90 degree
     # it's clockwise
     r270 = np.rot90(board)
@@ -120,10 +119,10 @@ def scoring_fun(game: Game, player: int, to_maximize: int):
         return -(mapping[max_rows] + mapping[max_columns] + mapping[diag1] + mapping[diag2])
 
 
-def minmax(game: Game, plyr_id, depth, alpha, beta) -> tuple[tuple[tuple[int, int], Move], float]:
+def minmax(game: Game, plyr_id, depth, alpha, beta, plyr_to_maximize: int) -> tuple[tuple[tuple[int, int], Move], float]:
     plyr_id += 1
     plyr_id %= 2
-    cache = max_cache if plyr_id == 0 else min_cache
+    cache = max_cache if plyr_id == plyr_to_maximize else min_cache
     # checking board and rotations in cache
     b90, b180, b270 = rotate_board(game.get_board())
     if (tuple(game.get_board().ravel()), depth) in cache:
@@ -137,18 +136,16 @@ def minmax(game: Game, plyr_id, depth, alpha, beta) -> tuple[tuple[tuple[int, in
     over = game.check_winner()
     next_actions = next_acts(game, plyr_id)
     if over != -1 or not next_actions or depth == 0:
-        # res = -(2 * over - 1) if over != -1 else 0
         prev_plr = plyr_id + 1
         prev_plr %= 2
-        res = scoring_fun(game, prev_plr, 0)
-        return None, res  # 1 for 0 player and -1 for 1 player
+        res = scoring_fun(game, prev_plr, plyr_to_maximize)
+        return None, res
     new_g = Game()
     new_g._board = game.get_board()
     new_g.current_player_idx = plyr_id
     best_move = None
     curr_alpha = alpha
     curr_beta = beta
-    # max_score = -math.inf if plyr_id == 0 else math.inf
     to_stop = False
     for move in next_actions:
         for direct in [Move.TOP, Move.LEFT, Move.RIGHT, Move.BOTTOM]:
@@ -158,12 +155,8 @@ def minmax(game: Game, plyr_id, depth, alpha, beta) -> tuple[tuple[tuple[int, in
             new_g._board = game.get_board()
             new_g.current_player_idx = plyr_id
             new_g._Game__move(move, direct, plyr_id)
-            _, score = minmax(new_g, plyr_id, depth - 1, curr_alpha, curr_beta)
-            # _, score = minmax(new_g, plyr_id, depth - 1, 0, 0)
-            if plyr_id == 0:  # to maximize
-                # if score > max_score:
-                #     max_score = score
-                #     best_move = (move, direct)
+            _, score = minmax(new_g, plyr_id, depth - 1, curr_alpha, curr_beta, plyr_to_maximize)
+            if plyr_id == plyr_to_maximize:  # to maximize
                 if score > curr_alpha:
                     curr_alpha = score
                     best_move = (move, direct)
@@ -171,9 +164,6 @@ def minmax(game: Game, plyr_id, depth, alpha, beta) -> tuple[tuple[tuple[int, in
                     to_stop = True
                     break
             else:
-                # if score < max_score:
-                #     max_score = score
-                #     best_move = (move, direct)
                 if score < curr_beta:  # to_minimize
                     curr_beta = score
                     best_move = (move, direct)
@@ -184,75 +174,7 @@ def minmax(game: Game, plyr_id, depth, alpha, beta) -> tuple[tuple[tuple[int, in
                 best_move = (move, direct)
         if to_stop:
             break
-    score_val = curr_alpha if plyr_id == 0 else curr_beta
+    score_val = curr_alpha if plyr_id == plyr_to_maximize else curr_beta
     if best_move:
         cache[tuple(game.get_board().ravel()), depth] = best_move, score_val
     return best_move, score_val
-    # if best_move:
-    #     cache[tuple(game.get_board().ravel()), depth] = best_move, max_score
-    # return best_move, max_score
-
-
-def basic_minmax(game: Game, plyr_id, depth, alpha, beta) -> tuple[tuple[tuple[int, int], Move], float]:
-    cache = max_cache if plyr_id == 0 else min_cache
-    # checking board and rotations in cache
-    b90, b180, b270 = rotate_board(game.get_board())
-    if (tuple(game.get_board().ravel()), depth) in cache:
-        return cache[tuple(game.get_board().ravel()), depth]
-    # if (tuple(b90.ravel()), depth) in cache:
-    #     return transform_move(cache[tuple(b90.ravel()), depth], 90)
-    # if (tuple(b180.ravel()), depth) in cache:
-    #     return transform_move(cache[tuple(b180.ravel()), depth], 180)
-    # if (tuple(b270.ravel()), depth) in cache:
-    #     return transform_move(cache[tuple(b270.ravel()), depth], 270)
-    plyr_id += 1
-    plyr_id %= 2
-    over = game.check_winner()
-    next_actions = next_acts(game, plyr_id)
-    if over != -1 or not next_actions or depth == 0:
-        res = -(2 * over - 1) if over != -1 else 0
-        return None, res  # 1 for 0 player and -1 for 1 player
-    new_g = Game()
-    new_g._board = game.get_board()
-    new_g.current_player_idx = plyr_id
-    best_move = None
-    # curr_alpha = alpha
-    # curr_beta = beta
-    max_score = -math.inf if plyr_id == 0 else math.inf
-    for move in next_actions:
-        for direct in [Move.TOP, Move.LEFT, Move.RIGHT, Move.BOTTOM]:
-            if not is_accetptable(move, direct, new_g):
-                continue
-            new_g = Game()
-            new_g._board = game.get_board()
-            new_g.current_player_idx = plyr_id
-            new_g._Game__move(move, direct, plyr_id)
-            # _, score = minmax(new_g, plyr_id, depth - 1, curr_alpha, curr_beta)
-            _, score = minmax(new_g, plyr_id, depth - 1, 0, 0)
-            if plyr_id == 0:  # to maximize
-                if score > max_score:
-                    max_score = score
-                    best_move = (move, direct)
-                # if score > curr_alpha:
-                #     curr_alpha = score
-                #     best_move = (move, direct)
-                # if score >= curr_beta:
-                #     break
-            else:
-                if score < max_score:
-                    max_score = score
-                    best_move = (move, direct)
-                # if score < curr_beta:  # to_minimize
-                #     curr_beta = score
-                #     best_move = (move, direct)
-                # if curr_alpha >= curr_beta:
-                #     break
-            if best_move is None:
-                best_move = (move, direct)
-    # score_val = curr_alpha if plyr_id == 0 else curr_beta
-    # if best_move:
-    #     cache[tuple(game.get_board().ravel()), depth] = best_move, score_val
-    # return best_move, curr_alpha
-    if best_move:
-        cache[tuple(game.get_board().ravel()), depth] = best_move, max_score
-    return best_move, max_score

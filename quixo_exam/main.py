@@ -1,8 +1,15 @@
 import math
 import random
+
+import numpy as np
+
 from game import Game, Move, Player
-from quixo_exam.training import minmax, is_accetptable, next_acts
+from quixo_exam.monteCarloTreeSearch import MonteCarloPlayer
+from quixo_exam.qtable import Qtable
+from quixo_exam.training import is_accetptable, next_acts
+from minmax import minmax
 from tqdm import tqdm
+from trainingQlearning import MyQPlayer
 
 
 def all_acceptable(game: Game):
@@ -14,11 +21,14 @@ def all_acceptable(game: Game):
             print((move, direct))
     print()
 
+
 class RandomPlayer(Player):
+    
     def __init__(self) -> None:
         super().__init__()
 
     def make_move(self, game: 'Game') -> tuple[tuple[int, int], Move]:
+        # game.print()
         from_pos = (random.randint(0, 4), random.randint(0, 4))
         move = random.choice([Move.TOP, Move.BOTTOM, Move.LEFT, Move.RIGHT])
         return from_pos, move
@@ -29,17 +39,23 @@ class MyPlayer(Player):
         super().__init__()
 
     def make_move(self, game: 'Game') -> tuple[tuple[int, int], Move]:
-        # all_acceptable(game)
+        # copy the game to avoid modifying it
+        tmp_game = Game()
+        tmp_game._board = game.get_board()
+        tmp_game.current_player_idx = game.current_player_idx
+        montecarlo = MonteCarloPlayer(tmp_game.current_player_idx, mcts_steps=100)
         depth = 4
-        minus_one_sum = sum([1 for val in list(game.get_board().ravel()) if val == -1])
-        # if minus_one_sum <= 7:
-        #     depth = 6
-        move, val = minmax(game, 1, depth, -math.inf, math.inf)
-        # if val == -1:
-        #     print("Losing game: ")
-        #     print(game.get_board())
-        #     print(move)
-        # print((move, val))
+        if (tmp_game.get_board() == -1).sum() < 6:
+            return montecarlo.make_move(tmp_game)
+        move, val = minmax(tmp_game, (tmp_game.current_player_idx + 1)%2 , depth, -math.inf, math.inf, tmp_game.current_player_idx)
+        # check if the move makes the opponent winning
+        check_winner_game = Game()
+        check_winner_game._board = tmp_game.get_board()
+        check_winner_game.current_player_idx = tmp_game.current_player_idx
+        check_winner_game._Game__move(move[0], move[1], tmp_game.current_player_idx)
+        # if it is use montecarlo tree search
+        if check_winner_game.check_winner() not in [-1, check_winner_game.current_player_idx]:
+            return montecarlo.make_move(tmp_game)
         return move
 
 
@@ -48,6 +64,7 @@ class InputPlayer(Player):
         super().__init__()
 
     def make_move(self, game: 'Game') -> tuple[tuple[int, int], Move]:
+        game.print()
         match = {"T": Move.TOP, "B": Move.BOTTOM, "L": Move.LEFT, "R": Move.RIGHT}
         ply = input("format <x-y-T/B/L/R>\n")
         words = ply.strip().split("-")
@@ -60,15 +77,15 @@ if __name__ == '__main__':
     draw_rate = 0
     for _ in tqdm(range(100)):
         g = Game()
-        # g.print()
-        player1 = MyPlayer()
-        player2 = RandomPlayer()
+        g.print()
+        # player1 = MonteCarloPlayer(player_id=0, mcts_steps=80)
+        player2 = MyPlayer()
+        player1 = RandomPlayer()
         winner = g.play(player1, player2)
-        if winner == 0:
+        if winner == 1:
             win_rate += 1
         elif winner == -1:
             draw_rate += 1
-        # g.print()
-        # print(f"Winner: Player {winner}")
         print(f"\n{win_rate}/100\n")
     print(f"\ndraw_rate: {draw_rate}/100\n")
+
