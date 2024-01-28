@@ -1,25 +1,9 @@
 import math
 import random
-
-import numpy as np
-
 from game import Game, Move, Player
 from quixo_exam.monteCarloTreeSearch import MonteCarloPlayer
-from quixo_exam.qtable import Qtable
-from quixo_exam.training import is_accetptable, next_acts
 from minmax import minmax
 from tqdm import tqdm
-from trainingQlearning import MyQPlayer
-
-
-def all_acceptable(game: Game):
-    next_actions = next_acts(game, 0)
-    for move in next_actions:
-        for direct in [Move.TOP, Move.LEFT, Move.RIGHT, Move.BOTTOM]:
-            if not is_accetptable(move, direct, game):
-                continue
-            print((move, direct))
-    print()
 
 
 class RandomPlayer(Player):
@@ -28,7 +12,6 @@ class RandomPlayer(Player):
         super().__init__()
 
     def make_move(self, game: 'Game') -> tuple[tuple[int, int], Move]:
-        # game.print()
         from_pos = (random.randint(0, 4), random.randint(0, 4))
         move = random.choice([Move.TOP, Move.BOTTOM, Move.LEFT, Move.RIGHT])
         return from_pos, move
@@ -74,18 +57,13 @@ class InputPlayer(Player):
 
 if __name__ == '__main__':
     win_rate = 0
-    draw_rate = 0
-    for _ in tqdm(range(100)):
+    for _ in tqdm(range(200)):
         g = Game()
         g.print()
-        # player1 = MonteCarloPlayer(player_id=0, mcts_steps=80)
         player2 = MyPlayer()
         player1 = RandomPlayer()
         winner = g.play(player1, player2)
         if winner == 1:
             win_rate += 1
-        elif winner == -1:
-            draw_rate += 1
-        print(f"\n{win_rate}/100\n")
-    print(f"\ndraw_rate: {draw_rate}/100\n")
+        print(f"\n{win_rate}/200\n")
 

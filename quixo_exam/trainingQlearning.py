@@ -6,7 +6,8 @@ from tqdm import tqdm
 import numpy as np
 from copy import deepcopy
 from quixo_exam.qtable import Qtable
-from quixo_exam.training import next_acts, is_accetptable, rotate_board, transform_move, minmax
+from quixo_exam.utils import next_acts, is_accetptable
+from quixo_exam.minmax import rotate_board, transform_move, minmax
 
 
 class QPlayer(Player):

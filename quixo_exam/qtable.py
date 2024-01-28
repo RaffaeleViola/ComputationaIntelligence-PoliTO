@@ -1,7 +1,5 @@
 from game import Move, Game
-import random
 from tqdm import tqdm
-from quixo_exam.training import next_acts, is_accetptable
 
 
 def read_tuple(tup: str):
