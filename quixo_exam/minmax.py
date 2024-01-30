@@ -3,8 +3,8 @@ from game import Game, Move
 from quixo_exam.utils import next_acts, is_accetptable
 
 
-max_cache = dict()
-min_cache = dict()
+# max_cache = dict()
+# min_cache = dict()
 
 
 def rotate_board(board: np.ndarray):
@@ -49,7 +49,7 @@ def scoring_fun(game: Game, player: int, to_maximize: int):
         return -(mapping[max_rows] + mapping[max_columns] + mapping[diag1] + mapping[diag2])
 
 
-def minmax(game: Game, plyr_id, depth, alpha, beta, plyr_to_maximize: int) -> tuple[tuple[tuple[int, int], Move], float]:
+def minmax(game: Game, plyr_id, depth, alpha, beta, plyr_to_maximize: int, max_cache, min_cache) -> tuple[tuple[tuple[int, int], Move], float]:
     plyr_id += 1
     plyr_id %= 2
     cache = max_cache if plyr_id == plyr_to_maximize else min_cache
@@ -85,7 +85,7 @@ def minmax(game: Game, plyr_id, depth, alpha, beta, plyr_to_maximize: int) -> tu
             new_g._board = game.get_board()
             new_g.current_player_idx = plyr_id
             new_g._Game__move(move, direct, plyr_id)
-            _, score = minmax(new_g, plyr_id, depth - 1, curr_alpha, curr_beta, plyr_to_maximize)
+            _, score = minmax(new_g, plyr_id, depth - 1, curr_alpha, curr_beta, plyr_to_maximize, max_cache, min_cache)
             if plyr_id == plyr_to_maximize:  # to maximize
                 if score > curr_alpha:
                     curr_alpha = score

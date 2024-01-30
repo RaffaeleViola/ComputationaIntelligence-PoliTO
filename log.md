@@ -73,7 +73,10 @@ game and I think that using other strategies would have only slowed the converge
 * All the mechanisms implement a **cache** in order to not compute the fitness for already seen individuals.
 #### Chosen Approach
 * This approach gives on average the best results over all the problem instances even though it is mostly effective 
-on instances 1 and 2.
+on instances 1 and 2. It firstly applies mutation over two selected parents (tournament) and after that it applies uniform crossover.
+On problems 5 and 10 the algorithm tends to reach a plateau in the fitness landscape, and it is no more able to escape 
+from that. The reason is probably that the fitness landscape of that instances has few picks that are hard to find,
+also by favoring exploration over exploitation.
 #### Approach for 5 - 10 instances
 * This approach implements an island model that is better in finding good solutions, but it needs more fitness calls.
 For problems 5 - 10, particularly thanks to the extinction mechanism, it is able to explore more parts of the fitness
@@ -104,7 +107,7 @@ opponent). The agent policy during training is an epsilon greedy policy.
   - key -> board state as tuple (hashable in Python)
   - value -> hashmap with key the tuple of the move (action) and value the float associated to that action
 
-The Qtable is initialized to a default value that I have chosen as 0.
+* The Qtable is initialized to a default value that I have chosen as 0.
 
 * The opponents of the agent are both a Random Player (p = 66,66%) and a MinMax Player (p = 33,34%). By trying with only 
 random player I noticed that the agent struggled to learn a reasonable amount of good strategies. I added a MinMax Agent 
@@ -119,20 +122,36 @@ against him my agent would learn only few strategies.
 
 
 #### Reviews done
-* Marco Cirone s314878: The main suggestion was to implement a backpropagation strategy by packing the history of states/moves
-rather than upgrading with reward only the previous move.
+* Marco Cirone s314878: The main suggestion was to implement for his Qlearning model a backpropagation strategy by 
+packing the history of states/moves rather than upgrading with reward only the previous move.
 * Ivan Magistro Contenta s314356: Same previous suggestion and I also suggested to store in qtable only the real available
-  actions (not all the nine positions) in order to reduce the memory footprint of the table. 
+actions (not all the nine positions) in order to reduce the memory footprint of the table. 
 
 #### Reviews received
 * Salvatore Latino s314872: He complimented for the implementation. Only suggestion was to use "Magic Square" proposed 
-in class. Good point, but I had already  considered that and I found myself more comfortable with a standard matrix.
+in class. Good point, but I had already  considered that before starting and I found myself more comfortable with a 
+standard matrix.
 * Nunzio Messineo s315067: He complimented for the implementation but suggested to reorganize the code to make it more
 understandable.
 
  ***
 
 ### Quixo Exam
+
+#### Agent proposed 
+The agent is proposed through the class MyPlayer. It combines two different agents under the hood, as explained below.
+On average, it reaches more than 95% victories against a random player. 
+
+Given that there is not a predefined use case of the agent, I do not manage the cache of the player and it can grow 
+without limits. Thus do not make it playing hundreds of thousands games (if you need it you can recreate another object).
+
+Project organization:
+- mimax.py -> MinMax agent
+- monteCarloTreeSearch.py -> MCTS agent
+- utils.py -> utility functions to generate next actions and check if they are acceptable given the current game state
+- qtable.py/trainingQlearning.py -> Qlearning implementation but the agent is not delivered for the exam, just if you
+want to take a look at it
+
 
 #### MinMax
 * Implemented MinMax Strategy with a limited depth considering the large search space 
@@ -161,9 +180,13 @@ def scoring_fun(game: Game, player: int, to_maximize: int):
 ```
 
 #### QLearning Tentative
-* I tried to implement a QLearning approach but even making it training for long time lead me to a quite random strategy.
+* I tried to implement a QLearning approach but even making it training for long time led me to a quite random strategy.
+It was a "brute force" approach, with no particular design of the data structure (a dict object) and of the serialization.
+I think that the best way to improve it would have been to implement all the possible symmetries and rotations in order
+to reduce the search space and store the boards considering 2 bits for every element in the matrix (there are 3
+possibilities) and  4 + 2 bits for a single action (16 positions on the perimeter and 4 possible directions).
 I left the code on GitHub, but I did not create an agent for the exam because I moved to the evaluation of the MCTS approach, that 
-seemed to me more promising for this task. The Qlearning implemented do not use Deep Learning.
+seemed to me more promising and less memory consuming. The Qlearning implemented do not use Deep Learning.
 
 #### Montecarlo Tree Search
 * I explored and implemented the Montecarlo Tree Search. I implemented a Node class to represent a state generated 
@@ -202,8 +225,9 @@ seemed to me more promising for this task. The Qlearning implemented do not use 
 
 * The expansion is performed by selecting randomly one of the possible moves available from the previously selected node
  and creating the new child node.
-* The simulation is performed by playing 70 random games and computing the statistics (win and draw rate)
-* The backpropagation is performed by propagating, following the parent pointer in the nodes, the previous statistics.
+* The simulation is performed by playing 70 random games and computing the statistics: win and draw rate. In my game 
+implementation a draw is when 100 total moves are reached.
+* The backpropagation is performed by propagating the previous statistics, following the parent pointer in the nodes.
 * Given the fact that the search space is not a tree because some boards can be recreated during the game (there are 
 cycles in the tree), I have added a global cache used in the selection phase to start from an already visited state as root
 (if present), and a local cache that avoids to get stuck in a cycle while visiting the tree towards a leaf.
@@ -216,4 +240,6 @@ cycles in the tree), I have added a global cache used in the selection phase to 
 * In order to enhance the overall performance I mixed the 2 agents. Most of the time the player is MinMax but if the 
 board has few free spots (the strategy is too conservative) or the MinMax plays a move that leads the opponent to 
 victory, the move is performed by MCTS. It is important to say that MinMax is depth-limited, thus it may end up in a 
-situation where every move leads the opponent to victory (for example the "doppio gioco" as in Tic Tac Toe)
+situation where every move leads the opponent to victory (for example the "doppio gioco" as in Tic Tac Toe). If this 
+case happens, the MinMax player will perform the move that makes the opponent winning and to avoid this behaviour I perform
+the move with the MCTS player.

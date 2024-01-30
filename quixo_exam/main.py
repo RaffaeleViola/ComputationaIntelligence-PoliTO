@@ -17,12 +17,47 @@ class RandomPlayer(Player):
         return from_pos, move
 
 
-class MyPlayer(Player):
+class MinMaxPlayer(Player):
+    """
+        MinMaxPlayer
+    """
     def __init__(self) -> None:
         super().__init__()
+        self.max_cache_1 = dict()
+        self.min_cache_1 = dict()
+        self.max_cache_0 = dict()
+        self.min_cache_0 = dict()
 
     def make_move(self, game: 'Game') -> tuple[tuple[int, int], Move]:
         # copy the game to avoid modifying it
+        max_cache, min_cache = (self.max_cache_1, self.min_cache_1) if game.current_player_idx == 1 \
+            else (self.max_cache_0, self.min_cache_0)
+        tmp_game = Game()
+        tmp_game._board = game.get_board()
+        tmp_game.current_player_idx = game.current_player_idx
+        depth = 4
+        move, val = minmax(tmp_game, (tmp_game.current_player_idx + 1)%2 , depth, -math.inf,
+                           math.inf, tmp_game.current_player_idx, max_cache, min_cache)
+        # check if the move makes the opponent winning
+        return move
+
+
+class MyPlayer(Player):
+    """
+    Player class delivered for the exam.
+    It combines a minmax player and a montecarlo player
+    """
+    def __init__(self) -> None:
+        super().__init__()
+        self.max_cache_1 = dict()
+        self.min_cache_1 = dict()
+        self.max_cache_0 = dict()
+        self.min_cache_0 = dict()
+
+    def make_move(self, game: 'Game') -> tuple[tuple[int, int], Move]:
+        # copy the game to avoid modifying it
+        max_cache, min_cache = (self.max_cache_1, self.min_cache_1) if game.current_player_idx == 1 \
+            else (self.max_cache_0, self.min_cache_0)
         tmp_game = Game()
         tmp_game._board = game.get_board()
         tmp_game.current_player_idx = game.current_player_idx
@@ -30,7 +65,8 @@ class MyPlayer(Player):
         depth = 4
         if (tmp_game.get_board() == -1).sum() < 6:
             return montecarlo.make_move(tmp_game)
-        move, val = minmax(tmp_game, (tmp_game.current_player_idx + 1)%2 , depth, -math.inf, math.inf, tmp_game.current_player_idx)
+        move, val = minmax(tmp_game, (tmp_game.current_player_idx + 1)%2 , depth, -math.inf,
+                           math.inf, tmp_game.current_player_idx, max_cache, min_cache)
         # check if the move makes the opponent winning
         check_winner_game = Game()
         check_winner_game._board = tmp_game.get_board()
@@ -57,7 +93,17 @@ class InputPlayer(Player):
 
 if __name__ == '__main__':
     win_rate = 0
-    for _ in tqdm(range(200)):
+    for _ in tqdm(range(100)):
+        g = Game()
+        g.print()
+        player1 = MyPlayer()
+        player2 = RandomPlayer()
+        winner = g.play(player1, player2)
+        if winner == 0:
+            win_rate += 1
+        print(f"\n{win_rate}/100\n")
+    win_rate = 0
+    for _ in tqdm(range(100)):
         g = Game()
         g.print()
         player2 = MyPlayer()
@@ -65,5 +111,5 @@ if __name__ == '__main__':
         winner = g.play(player1, player2)
         if winner == 1:
             win_rate += 1
-        print(f"\n{win_rate}/200\n")
+        print(f"\n{win_rate}/100\n")
 
